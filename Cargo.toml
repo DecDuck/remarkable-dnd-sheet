@@ -1,0 +1,19 @@
+[package]
+name = "remarkable-calc"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[[bin]]
+name = "hello_remarkable"
+path = "src/main.rs"
+
+[dependencies]
+cxx = "1.0"
+cxx-qt = "0.8"
+cxx-qt-lib = { version = "0.8", features = ["full"] }
+evdev = "0.12"
+
+[build-dependencies]
+cxx-qt-build = "0.8"
+cc = "1.0"

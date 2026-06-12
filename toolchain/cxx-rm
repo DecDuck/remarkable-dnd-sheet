@@ -1,0 +1,19 @@
+#!/bin/sh
+# C++ compiler / linker driver wrapper for the reMarkable Yocto SDK.
+#
+# Fedora's rustc injects "-fuse-ld=lld" when invoking the linker, but the SDK
+# only ships bfd/gold (and we must use the SDK linker so the target sysroot is
+# honoured, not the host's /usr/bin/ld.lld). Strip any -fuse-ld=* so gcc falls
+# back to its default sibling ld (bfd), which links correctly against the
+# device sysroot.
+for arg in "$@"; do
+  shift
+  case "$arg" in
+    -fuse-ld=*) continue ;;
+  esac
+  set -- "$@" "$arg"
+done
+
+exec /home/decduck/sdk/sysroots/aarch64-codexsdk-linux/usr/bin/aarch64-remarkable-linux/aarch64-remarkable-linux-g++ \
+  -mcpu=cortex-a53+crc+crypto -mbranch-protection=standard \
+  --sysroot=/home/decduck/sdk/sysroots/cortexa53-crypto-remarkable-linux "$@"

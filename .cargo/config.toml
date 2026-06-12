@@ -1,0 +1,20 @@
+# Cross-compile configuration for the reMarkable Paper Pro (Yocto SDK).
+#
+# The host and target triple are both aarch64-unknown-linux-gnu, so Cargo
+# treats this as a native build. We redirect the C/C++ compiler, archiver and
+# linker to the SDK toolchain (which bakes in the target sysroot via wrapper
+# scripts) so the produced binary links against the device's Qt 6.8.2 and
+# glibc 2.39. The host glibc (2.41) is newer, so build-script and proc-macro
+# binaries linked against the target sysroot still run on the host.
+
+[target.aarch64-unknown-linux-gnu]
+linker = "/home/decduck/Dev/remarkable/cfuckfuck/toolchain/cxx-rm"
+
+[env]
+# qmake from the SDK: reports target headers/libs but host-runnable moc/rcc.
+QMAKE = { value = "/home/decduck/sdk/sysroots/aarch64-codexsdk-linux/usr/bin/qmake6", force = true }
+CC = { value = "/home/decduck/Dev/remarkable/cfuckfuck/toolchain/cc-rm", force = true }
+CXX = { value = "/home/decduck/Dev/remarkable/cfuckfuck/toolchain/cxx-rm", force = true }
+AR = { value = "/home/decduck/sdk/sysroots/aarch64-codexsdk-linux/usr/bin/aarch64-remarkable-linux/aarch64-remarkable-linux-ar", force = true }
+LC_ALL = { value = "C.UTF-8", force = true }
+LANG = { value = "C.UTF-8", force = true }

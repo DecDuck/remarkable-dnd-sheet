@@ -1,0 +1,5 @@
+#!/bin/sh
+# C compiler wrapper for the reMarkable Yocto SDK (target sysroot).
+exec /home/decduck/sdk/sysroots/aarch64-codexsdk-linux/usr/bin/aarch64-remarkable-linux/aarch64-remarkable-linux-gcc \
+  -mcpu=cortex-a53+crc+crypto -mbranch-protection=standard \
+  --sysroot=/home/decduck/sdk/sysroots/cortexa53-crypto-remarkable-linux "$@"
