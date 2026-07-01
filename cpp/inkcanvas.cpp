@@ -99,6 +99,60 @@ void InkCanvas::clear()
     update();
 }
 
+void InkCanvas::eraseAt(qreal x, qreal y, qreal radius)
+{
+    // Remove every segment that passes within `radius` pixels of (x, y).
+    // A segment AB is "hit" when the distance from (x,y) to the closest point
+    // on the line AB is less than radius.  We use the standard point-to-segment
+    // distance formula.
+    const QPointF p(x, y);
+    const qreal r2 = radius * radius;
+
+    QRectF dirty;
+    bool any = false;
+
+    auto pointToSegmentDist2 = [](QPointF p, QPointF a, QPointF b) -> qreal {
+        const QPointF ab = b - a;
+        const qreal len2 = ab.x() * ab.x() + ab.y() * ab.y();
+        if (len2 < 1e-10) {
+            // Degenerate segment — just distance to a
+            QPointF d = p - a;
+            return d.x() * d.x() + d.y() * d.y();
+        }
+        const qreal t = qBound(0.0,
+            ((p.x() - a.x()) * ab.x() + (p.y() - a.y()) * ab.y()) / len2,
+            1.0);
+        const QPointF proj(a.x() + t * ab.x(), a.y() + t * ab.y());
+        const QPointF d = p - proj;
+        return d.x() * d.x() + d.y() * d.y();
+    };
+
+    QList<Segment> kept;
+    kept.reserve(m_segments.size());
+
+    for (const Segment &seg : m_segments) {
+        if (pointToSegmentDist2(p, seg.a, seg.b) < r2) {
+            const QRectF sb = segmentBounds(seg);
+            dirty = any ? dirty.united(sb) : sb;
+            any = true;
+        } else {
+            kept.append(seg);
+        }
+    }
+
+    if (any) {
+        m_segments = std::move(kept);
+        // Also invalidate the eraser circle itself so the white erase region
+        // is repainted even when no segments were near the boundary.
+        const QRectF eraserRect(x - radius, y - radius, radius * 2, radius * 2);
+        dirty = dirty.united(eraserRect);
+        update(dirty.adjusted(-1, -1, 1, 1).toAlignedRect());
+    }
+
+    // Always reset the draw cursor; the eraser tip doesn't start a new stroke.
+    m_hasLast = false;
+}
+
 void InkCanvas::paint(QPainter *painter)
 {
     if (m_segments.isEmpty()) {

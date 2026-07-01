@@ -16,6 +16,7 @@ pub mod qobject {
         #[qproperty(f64, penY)]
         #[qproperty(f64, pressure)]
         #[qproperty(bool, penDown)]
+        #[qproperty(bool, eraserDown)]
         #[qproperty(bool, active)]
         #[qproperty(f64, screenWidth)]
         #[qproperty(f64, screenHeight)]
@@ -41,6 +42,7 @@ pub struct PenInputRust {
     penY: f64,
     pressure: f64,
     penDown: bool,
+    eraserDown: bool,
     active: bool,
     screenWidth: f64,
     screenHeight: f64,
@@ -54,6 +56,7 @@ struct Frame {
     norm_y: f64,
     pressure: f64,
     pen_down: bool,
+    eraser_down: bool,
 }
 
 impl qobject::PenInput {
@@ -102,6 +105,11 @@ fn reader_loop(mut device: evdev::Device, qt_thread: cxx_qt::CxxQtThread<qobject
     let mut raw_y = 0i32;
     let mut raw_p = 0i32;
     let mut pen_down = false;
+    let mut eraser_down = false;
+    // BTN_TOOL_RUBBER = eraser end is proximate (hover). BTN_TOUCH = actual
+    // contact. We track the tool orientation separately so we can combine them:
+    // eraser_down is only true when the eraser end is hovering AND touching.
+    let mut tool_rubber = false;
 
     loop {
         let events = match device.fetch_events() {
@@ -121,10 +129,18 @@ fn reader_loop(mut device: evdev::Device, qt_thread: cxx_qt::CxxQtThread<qobject
                     }
                 }
                 InputEventKind::Key(key) => {
-                    // BTN_TOUCH = tip in contact (drawing). BTN_TOOL_PEN is only
-                    // hover/proximity and must not count as a stroke.
+                    // BTN_TOUCH = physical contact (tip or eraser end touching).
+                    // BTN_TOOL_PEN / BTN_TOOL_RUBBER = proximity (hover only).
+                    // We combine them: pen_down = touch AND NOT rubber;
+                    //                  eraser_down = touch AND rubber.
                     if key == Key::BTN_TOUCH {
-                        pen_down = event.value() != 0;
+                        let touching = event.value() != 0;
+                        pen_down    = touching && !tool_rubber;
+                        eraser_down = touching &&  tool_rubber;
+                    } else if key == Key::BTN_TOOL_RUBBER {
+                        tool_rubber = event.value() != 0;
+                        // Orientation flipped while hovering — update contact flags.
+                        if !tool_rubber { eraser_down = false; }
                     }
                 }
                 InputEventKind::Synchronization(_) => {
@@ -132,7 +148,7 @@ fn reader_loop(mut device: evdev::Device, qt_thread: cxx_qt::CxxQtThread<qobject
                     let norm_y = ((raw_y - min_y) as f64 / (max_y - min_y) as f64).clamp(0.0, 1.0);
                     let pressure = ((raw_p - min_p) as f64 / (max_p - min_p) as f64).clamp(0.0, 1.0);
 
-                    let frame = Frame { norm_x, norm_y, pressure, pen_down };
+                    let frame = Frame { norm_x, norm_y, pressure, pen_down, eraser_down };
 
                     // Apply on the Qt thread; ignore if the object is gone.
                     let _ = qt_thread.queue(move |qobject| {
@@ -153,6 +169,7 @@ fn apply_frame(mut qobject: Pin<&mut qobject::PenInput>, frame: Frame) {
     qobject.as_mut().set_penY(frame.norm_y * h);
     qobject.as_mut().set_pressure(frame.pressure);
     qobject.as_mut().set_penDown(frame.pen_down);
+    qobject.as_mut().set_eraserDown(frame.eraser_down);
     qobject.as_mut().pen_changed();
 }
 

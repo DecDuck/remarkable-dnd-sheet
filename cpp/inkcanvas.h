@@ -33,6 +33,7 @@ public:
 
     Q_INVOKABLE void moveTo(qreal x, qreal y);
     Q_INVOKABLE void lineTo(qreal x, qreal y);
+    Q_INVOKABLE void eraseAt(qreal x, qreal y, qreal radius);
     Q_INVOKABLE void clear();
 
     void paint(QPainter *painter) override;

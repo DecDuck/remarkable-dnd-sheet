@@ -1,18 +1,23 @@
-//! reMarkable Paper Pro calculator + ink — Rust + cxx-qt.
+//! reMarkable Paper Pro — D&D 5e character sheet + ink — Rust + cxx-qt.
 //!
-//! The UI is QML; the calculator state machine and the marker/pen reader live
-//! in the Rust `Calculator` and `PenInput` QObjects. The ink surface is the C++
-//! `InkCanvas` (a QQuickPaintedItem, the epaper backend's supported draw path),
+//! The UI is QML; the character sheet state lives in the Rust `CharacterSheet`
+//! QObject, and the marker/pen reader in `PenInput`. The ink surface is the C++
+//! `InkCanvas` (QQuickPaintedItem, the epaper backend's supported draw path),
 //! registered via `register_ink_types()`.
 
-pub mod calculator;
+pub mod charsheet;
 pub mod peninput;
+pub mod dnd_data;
+pub mod player;
 
 use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QUrl};
 
 extern "C" {
     // Defined in cpp/ink_bridge.cpp; registers InkCanvas under "InkTools 1.0".
     fn register_ink_types();
+    // Forces the charsheet QRC resources (PNG background + fields JSON) to be
+    // registered with Qt's resource system before the QML engine is created.
+    fn init_charsheet_resources();
 }
 
 fn main() {
@@ -33,6 +38,11 @@ fn main() {
     }
 
     let mut app = QGuiApplication::new();
+
+    // Register the embedded Qt resources (charsheet PNG + fields JSON compiled
+    // in by build.rs from sheet.pdf via rcc). Must happen before the engine
+    // loads so qrc:/charsheet/* URLs resolve.
+    unsafe { init_charsheet_resources() };
 
     // Must run before any QML that imports InkTools is loaded.
     unsafe { register_ink_types() };
